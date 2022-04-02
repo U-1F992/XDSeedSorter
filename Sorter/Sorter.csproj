@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LINENotify" Version="1.0.0" />
+    <PackageReference Include="OpenCvSharp4" Version="4.5.5.20211231" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.5.5.20211231" />
+    <PackageReference Include="PokemonPRNG" Version="3.2.0" />
+    <PackageReference Include="PokemonXDImageLibrary" Version="0.2.0" />
+    <PackageReference Include="Sunameri" Version="3.1.0" />
+
+    <None Update="config.json" CopyToOutputDirectory="Always" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PokemonXDRNGLibrary\PokemonXDRNGLibrary.csproj" />
+    <ProjectReference Include="..\ConsumptionNavigator\ConsumptionNavigator.csproj" />
+  </ItemGroup>
+
+</Project>

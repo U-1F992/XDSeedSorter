@@ -1,0 +1,367 @@
+{
+    "portName": "COM6",
+    "captureIndex": 1,
+    "token": "",
+    "tsv": 65536,
+    "targets": [
+        195951310,
+        3735943886
+    ],
+    "waitTime": {
+        "maximum": "03:00:00",
+        "left": "00:03:00"
+    },
+    "advancesPerSecond": 3713.6,
+    "sequences": {
+        "reset": [
+            {
+                "message": "b",
+                "interval": 0
+            },
+            {
+                "message": "c",
+                "interval": 0
+            },
+            {
+                "message": "h",
+                "interval": 5000
+            },
+            {
+                "message": "t",
+                "interval": 0
+            },
+            {
+                "message": "o",
+                "interval": 0
+            },
+            {
+                "message": "n",
+                "interval": 10000
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 20000
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 2500
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 1000
+            }
+        ],
+        "moveQuickBattle": [
+            {
+                "message": "1",
+                "interval": 100
+            },
+            {
+                "message": "z",
+                "interval": 800
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 1500
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 2000
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 1000
+            }
+        ],
+        "loadParties": [
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 1000
+            }
+        ],
+        "discardParties": [
+            {
+                "message": "b",
+                "interval": 100
+            },
+            {
+                "message": "n",
+                "interval": 1000
+            }
+        ],
+        "entryToBattle": [
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 7000
+            },
+            {
+                "message": "b",
+                "interval": 100
+            },
+            {
+                "message": "n",
+                "interval": 4000
+            },
+            {
+                "message": "b",
+                "interval": 100
+            },
+            {
+                "message": "n",
+                "interval": 26000
+            }
+        ],
+        "exitBattle": [
+            {
+                "message": "h",
+                "interval": 100
+            },
+            {
+                "message": "t",
+                "interval": 500
+            },
+            {
+                "message": "2",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 500
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 12000
+            },
+            {
+                "message": "b",
+                "interval": 100
+            },
+            {
+                "message": "n",
+                "interval": 4000
+            }
+        ],
+        "moveMenu": [
+            {
+                "message": "b",
+                "interval": 100
+            },
+            {
+                "message": "n",
+                "interval": 800
+            },
+            {
+                "message": "b",
+                "interval": 100
+            },
+            {
+                "message": "n",
+                "interval": 1500
+            },
+            {
+                "message": "b",
+                "interval": 100
+            },
+            {
+                "message": "n",
+                "interval": 2000
+            },
+            {
+                "message": "y",
+                "interval": 100
+            },
+            {
+                "message": "z",
+                "interval": 1000
+            }
+        ],
+        "moveOptions": [
+            {
+                "message": "2",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 1000
+            }
+        ],
+        "enableVibration": [
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 1500
+            },
+            {
+                "message": "2",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 300
+            },
+            {
+                "message": "y",
+                "interval": 100
+            },
+            {
+                "message": "z",
+                "interval": 300
+            },
+            {
+                "message": "2",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 300
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 500
+            },
+            {
+                "message": "4",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 300
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 8000
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 2000
+            }
+        ],
+        "disableVibration": [
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 1500
+            },
+            {
+                "message": "2",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 300
+            },
+            {
+                "message": "1",
+                "interval": 100
+            },
+            {
+                "message": "z",
+                "interval": 300
+            },
+            {
+                "message": "2",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 300
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 500
+            },
+            {
+                "message": "4",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 300
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 8000
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 2000
+            }
+        ],
+        "finalize": [
+            {
+                "message": "4",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 2000
+            }
+        ]
+    }
+}
