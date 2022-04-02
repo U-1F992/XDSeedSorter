@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include=".\XDDB.bin" LogicalName="XDDB.bin" />
+    <PackageReference Include="PokemonPRNG" Version="3.2.0" />
+    <PackageReference Include="PokemonXDImageLibrary" Version="0.2.0" />
+  </ItemGroup>
+
+</Project>

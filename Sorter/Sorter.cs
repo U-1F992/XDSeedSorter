@@ -1,0 +1,486 @@
+﻿using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.IO.Ports;
+
+using LINENotify;
+using OpenCvSharp;
+using PokemonPRNG.LCG32.GCLCG;
+using PokemonXDImageLibrary;
+using PokemonXDRNGLibrary;
+using Sunameri;
+
+namespace XDSeedSorter;
+public class Sorter : IDisposable
+{
+    private Config _config;
+    private List<(uint hp, uint seed)> _xddb;
+    private SerialPort _serialPort;
+    private CancellationTokenSource _cancellationTokenSource;
+    private CancellationToken _cancellationToken;
+    private Mat _mat = new Mat();
+    private Task _task;
+
+    public Sorter()
+    {
+        Config? json = JsonSerializer.Deserialize<Config>(File.ReadAllText(Path.Join(AppContext.BaseDirectory, "config.json")));
+        _config = json != null ? json : throw new FileNotFoundException();
+
+        // XDDB読み込み
+        _xddb = XDDatabase.LoadDB();
+
+        // デバイス割り当て
+        _serialPort = new SerialPort(_config.PortName, 4800);
+        // WHALEからのメッセージをConsoleに書いていく
+        _serialPort.DtrEnable = true;
+        _serialPort.Encoding = Encoding.UTF8;
+        _serialPort.DataReceived += (object sender, SerialDataReceivedEventArgs e) =>
+        {
+            var serialPort = (SerialPort)sender;
+            if (!serialPort.IsOpen) return;
+            var data = serialPort.ReadExisting();
+            if (string.IsNullOrEmpty(data) || string.IsNullOrWhiteSpace(data)) return;
+            // Console.Error.WriteLine(string.Format("[WHALE] [TRACE] {0} -> {1}", DateTime.Now.ToString("HH:mm:ss.fff"), data.Replace("\n", "")));
+        };
+        _serialPort.Open();
+        _serialPort.Initialize();
+
+        // _videoCaptureから_matを取得して表示を更新する
+        _cancellationTokenSource = new CancellationTokenSource();
+        _cancellationToken = _cancellationTokenSource.Token;
+        var ready = false;
+        _task = Task.WhenAll
+        (
+            Task.Run(() =>
+            {
+                using (var videoCapture = new VideoCapture(_config.CaptureIndex))
+                    while (!_cancellationToken.IsCancellationRequested)
+                        lock (_mat)
+                            if (videoCapture.Read(_mat) && !ready) ready = true;
+            }, _cancellationToken),
+            Task.Run(() =>
+            {
+                while (!ready) ;
+                using (var window = new Window())
+                    while (!_cancellationToken.IsCancellationRequested)
+                    {
+                        window.ShowImage(_mat);
+                        Cv2.WaitKey(1);
+                    }
+            }, _cancellationToken)
+        );
+
+        Notifier.Send(_config.Token, "「ポケモンXD 闇の旋風ダーク・ルギア」初期seed厳選を開始します。");
+    }
+    /// <summary>
+    /// _matを一時的に保存->Streamに読み込んでNotifier.Send
+    /// </summary>
+    /// <param name="message"></param>
+    /// <param name="mat"></param>
+    /// <param name="cancellationToken"></param>
+    async Task Notifier_SendWithMat(string message, CancellationToken cancellationToken)
+    {
+        var mat = new Mat();
+        lock (_mat) mat = _mat.Clone();
+
+        var tmpPath = Path.GetTempFileName() + ".png";
+        if (mat.Resize(new Size(), 0.5, 0.5).SaveImage(tmpPath))
+        {
+            using (var stream = File.OpenRead(tmpPath))
+                await Notifier.SendAsync(_config.Token, message, stream, cancellationToken);
+            File.Delete(tmpPath);
+        }
+        else
+            await Notifier.SendAsync(_config.Token, message + "\n(画像の保存に失敗しました。)", cancellationToken);
+    }
+
+    public async Task StartAsync() { await StartAsync(CancellationToken.None); }
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <exception cref="OperationCanceledException"/>
+    /// <returns></returns>
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        var mat = new Mat();
+        UInt32 currentSeed;
+        (UInt32 Seed, TimeSpan WaitTime) target;
+
+        // 初回に振動設定を「あり」に変更しておく
+        await _serialPort.RunAsync
+        (
+            _config.Sequences[Sequences.Reset]
+                .Concat(_config.Sequences[Sequences.MoveOptions])
+                .Concat(_config.Sequences[Sequences.EnableVibration]).ToArray(),
+            cancellationToken
+        );
+
+        do
+        {
+            do
+            {
+                currentSeed = await GetCurrentSeedAfterReset(cancellationToken);
+                target = SetTarget(currentSeed);
+                Console.WriteLine(string.Format("Current seed : {0:X}", currentSeed));
+
+            } while (target.WaitTime > _config.WaitTime[WaitTime.Maximum]);
+            Console.WriteLine("");
+            Console.WriteLine(string.Format("Suitable for wait : {0:X} -> {1:X}", currentSeed, target.Seed));
+
+            // 算出された待機時間が、いますぐバトル生成で微調整するために残す消費時間より長い場合
+            // 高速消費
+            if (target.WaitTime > _config.WaitTime[WaitTime.Left])
+            {
+                var waitTime = target.WaitTime - _config.WaitTime[WaitTime.Left];
+                Console.WriteLine(string.Format("ETA : {0}", DateTime.Now + waitTime));
+                await Notifier_SendWithMat(string.Format("条件を満たすseedです。高速消費に移行します。\n{0:X} -> {1:X}\nETA : {2}", currentSeed, target.Seed, DateTime.Now + waitTime), cancellationToken);
+
+                await AdvanceByMoltres(waitTime, cancellationToken);
+                Console.WriteLine("Faster advance has been completed.");
+                Console.WriteLine("");
+
+                UInt32? tmp;
+                if ((tmp = await GetCurrentSeed(cancellationToken)) == null)
+                {
+                    Console.WriteLine("Could not find current seed. Reset...");
+                    Console.WriteLine("");
+                    await Notifier.SendAsync(_config.Token, "高速消費後、現在のseedを再特定できませんでした。リセットします...", cancellationToken);
+                    continue;
+                }
+                currentSeed = (uint)tmp;
+                Console.WriteLine(string.Format("Current seed : {0:X}", currentSeed));
+                await Notifier_SendWithMat(string.Format("高速消費が完了しました。\n{0:X}", currentSeed), cancellationToken);
+
+                target = SetTarget(currentSeed);
+            }
+
+            // 仮にファイヤー出し過ぎてseed超えてしまった場合は、待機時間は先ほどwhileを抜けた条件を満たせなくなるので、リセットに戻れる
+        } while (target.WaitTime > _config.WaitTime[WaitTime.Maximum]);
+
+        try
+        {
+            await AdjustSeed(currentSeed, target.Seed, cancellationToken);
+        }
+        catch (OperationCanceledException) { cancellationToken.ThrowIfCancellationRequested(); }
+        catch
+        {
+            // - 目標のseedまで到達する手段がない場合(近過ぎ 40で割り切れない)
+            // - いますぐバトルの再生成中にseedを見失った場合 など
+            // 設定変更からやり直し
+            Console.WriteLine("Could not manipulate current seed properly. Reset...");
+            Console.WriteLine("");
+            await Notifier.SendAsync(_config.Token, "現在のseedから目標seedまで到達する手段がないか、現在のseedを見失いました。リセットします...", cancellationToken);
+            await StartAsync(cancellationToken);
+            return;
+        }
+
+        await _serialPort.RunAsync(_config.Sequences[Sequences.Finalize], cancellationToken);
+        Console.WriteLine(string.Format("Successfully reached to target seed : {0:X}", target.Seed));
+        await Notifier_SendWithMat(string.Format("seed厳選が完了しました。\n{0:X}", target.Seed), cancellationToken);
+    }
+
+    /// <summary>
+    /// <see cref="Config"/> で与えられた目標seedの中で、現在のseedから最も短い待機時間で到達できるものと、その待機時間を返す。
+    /// </summary>
+    /// <param name="currentSeed"></param>
+    /// <returns></returns>
+    private (UInt32 Seed, TimeSpan WaitTime) SetTarget(UInt32 currentSeed)
+    {
+        // targetSeedsそれぞれとcurrentSeed間の待機時間を算出する
+        var waitTimes = new Dictionary<UInt32, TimeSpan>();
+        foreach (var targetSeed in _config.Targets)
+            waitTimes.Add(targetSeed, TimeSpan.FromSeconds(targetSeed.GetIndex(currentSeed) / _config.AdvancesPerSecond));
+
+        // 最も待機時間の短いものを返す
+        var pair = waitTimes.OrderBy(pair => pair.Value).First();
+        return (pair.Key, pair.Value);
+    }
+
+    /// <summary>
+    /// リセットして、現在のseedを求める。<br/>
+    /// いますぐバトル情報を取得できなかった場合、再びリセットを行い、戻り値として必ずseedを返すようにする。<br/>
+    /// ---<br/>
+    /// 事前条件: ディスクが読み込まれており、<see cref="Config"/> で定義された所定の状態を行うことができる状態<br/>
+    /// 事後条件: いますぐバトル「さいきょう」のパーティが表示され、「はい」にカーソルが合っている状態
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    private async Task<UInt32> GetCurrentSeedAfterReset(CancellationToken cancellationToken)
+    {
+        UInt32? currentSeed = null;
+
+        do // 現在seedを特定できるまで
+        {
+            // リセット -> いますぐバトル1回目読み込み
+            await _serialPort.RunAsync
+            (
+                _config.Sequences[Sequences.Reset]
+                    .Concat(_config.Sequences[Sequences.MoveQuickBattle])
+                    .Concat(_config.Sequences[Sequences.LoadParties]).ToArray(),
+                cancellationToken
+            );
+
+            // いますぐバトルを数回読み込み直して現在seedを特定
+            // seedを特定できなかった場合 -> do-whileの先頭へ戻り、リセットから再度特定へ
+        } while ((currentSeed = await GetCurrentSeed(cancellationToken)) == null);
+
+        // if (currentSeed == null) throw new Exception("This can't happen.");
+        return (UInt32)currentSeed;
+    }
+
+    /// <summary>
+    /// 現在のseedを求める。<br/>
+    /// 5回連続でいますぐバトル情報を取得できなかった場合、事前条件が満たされていないものとしてnullを返す。<br/>
+    /// ---<br/>
+    /// 事前条件: いますぐバトル「さいきょう」のパーティが表示された状態<br/>
+    /// 事後条件: いますぐバトル「さいきょう」のパーティが表示され、「はい」にカーソルが合った状態
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    private async Task<UInt32?> GetCurrentSeed(CancellationToken cancellationToken)
+    {
+        var mat = new Mat();
+        var quickbattles = new QuickBattleParties?[2];
+
+        // いますぐバトル1回目
+        await _serialPort.RunAsync(_config.Sequences[Sequences.DiscardParties].Concat(_config.Sequences[Sequences.LoadParties]).ToArray(), cancellationToken);
+        try
+        {
+            lock (_mat) mat = _mat.Clone();
+            quickbattles[0] = mat.GetQuickBattleParties();
+        }
+        catch { quickbattles[0] = null; }
+
+        List<uint> candidates;
+        var count = 0;
+        do
+        {
+            // いますぐバトル2回目以降
+            await _serialPort.RunAsync(_config.Sequences[Sequences.DiscardParties].Concat(_config.Sequences[Sequences.LoadParties]).ToArray(), cancellationToken);
+            try
+            {
+                lock (_mat) mat = _mat.Clone();
+                quickbattles[1] = mat.GetQuickBattleParties();
+            }
+            catch
+            {
+                quickbattles[1] = null;
+                if (++count == 5) return null;
+            }
+
+            if (quickbattles[0] != null && quickbattles[1] != null)
+            {
+                // nullにはならないって言っているのに...
+#pragma warning disable CS8629
+                candidates = _xddb.SearchSeed(new QuickBattleParties[] { (QuickBattleParties)quickbattles[0], (QuickBattleParties)quickbattles[1] }, _config.Tsv);
+#pragma warning restore
+            }
+            else candidates = new();
+
+            quickbattles[0] = quickbattles[1];
+        } while (candidates.Count != 1);
+
+        mat.Dispose();
+        return candidates[0];
+    }
+
+    /// <summary>
+    /// いますぐバトル戦闘画面にファイヤーを出し、高速消費する。<br/>
+    /// ---<br/>
+    /// 事前条件: いますぐバトル「さいきょう」のパーティが表示された状態<br/>
+    /// 事後条件: ファイヤーとの戦闘を離脱し、いますぐバトル「さいきょう」のパーティが表示された状態
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    private async Task AdvanceByMoltres(TimeSpan waitTime, CancellationToken cancellationToken)
+    {
+        var mat = new Mat();
+        lock (_mat) mat = _mat.Clone();
+
+        // ファイヤーが出るまで再生成
+        while (true)
+        {
+            try
+            {
+                while (mat.GetQuickBattleParties().COM.Index != 2)
+                {
+                    await _serialPort.RunAsync(_config.Sequences[Sequences.DiscardParties].Concat(_config.Sequences[Sequences.LoadParties]).ToArray(), cancellationToken);
+                    lock (_mat) mat = _mat.Clone();
+                }
+                break;
+            }
+            catch
+            {
+                // ここでQuickBattleParties取得できないなら、次段の消費後現在seed特定も失敗するはず
+                // 高速消費を諦めてリセットさせる
+                return;
+            }
+        }
+        mat.Dispose();
+
+        // 戦闘入って待機して出る
+        await _serialPort.RunAsync(_config.Sequences[Sequences.EntryToBattle], cancellationToken);
+        await Task.Delay(waitTime, cancellationToken);
+        await _serialPort.RunAsync
+        (
+            _config.Sequences[Sequences.ExitBattle]
+                .Concat(_config.Sequences[Sequences.LoadParties]).ToArray(),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// いますぐバトル生成と設定変更で、目標seedちょうどまで消費する。<br/>
+    /// 目標の生成回数直前に色回避があると、絶対に目標seedに到達できないことがあり得るかも...？<br/>
+    /// ---<br/>
+    /// 事前条件: いますぐバトル「さいきょう」のパーティが表示された状態<br/>
+    /// 事後条件: 設定変更を終え、「せってい」にカーソルが合った状態
+    /// </summary>
+    /// <param name="currentSeed"></param>
+    /// <param name="targetSeed"></param>
+    /// <param name="cancellationToken"></param>
+    /// <exception cref="Exception"/>
+    /// <returns></returns>
+    private async Task AdjustSeed(UInt32 currentSeed, UInt32 targetSeed, CancellationToken cancellationToken)
+    {
+        var mat = new Mat();
+
+        // seed微調整のための行動を計算
+        var advances = ConsumptionNavigator.Calculate(currentSeed, targetSeed, _config.Tsv);
+        Console.WriteLine(string.Format
+        (
+            "Generate Quick Battle parties : {0}\nChange vibration option : {1}", 
+            advances.GenerateParties, 
+            advances.ChangeSetting
+        ));
+        await Notifier.SendAsync(_config.Token, string.Format
+        (
+            "目標seedまでの端数を消費します。いますぐバトル生成 : {0}回\n振動設定変更 : {1}回", 
+            advances.GenerateParties, 
+            advances.ChangeSetting
+        ), cancellationToken);
+
+        // いますぐバトル生成
+        for (var i = 0; i < advances.GenerateParties; i++)
+        {
+            await _serialPort.RunAsync(_config.Sequences[Sequences.DiscardParties].Concat(_config.Sequences[Sequences.LoadParties]).ToArray(), cancellationToken);
+
+            lock (_mat) mat = _mat.Clone();
+            var parties = advances.Parties[i];
+            if (new QuickBattleParties((int)parties.pIndex, (int)parties.eIndex, parties.HP) != mat.GetQuickBattleParties())
+            {
+                Console.WriteLine("Found a discrepancy between the prediction and actually generated. Attempt to re-find current seed.");
+                Console.WriteLine("");
+                await Notifier_SendWithMat("生成予測と実際に生成された手持ちに齟齬が見られます。現在seedの再特定を試みます。", cancellationToken);
+
+                // 予測と実際に生成された手持ちに齟齬があった場合
+                UInt32? tmp;
+                if ((tmp = await GetCurrentSeed(cancellationToken)) == null)
+                {
+                    // そもそも違う画面になってしまっている場合
+                    // -> StartAsyncのtry-catchに拾ってもらってリセット
+                    throw new Exception();
+                }
+                // 現在のseedは特定できた場合
+                // -> 求めたseedと目標seedで微調整を仕切り直す
+                Console.WriteLine(string.Format("Current seed : {0:X}", currentSeed));
+                await Notifier_SendWithMat(string.Format("現在のseedを再特定しました。\n{0:X}", currentSeed), cancellationToken);
+
+                await AdjustSeed((UInt32)tmp, targetSeed, cancellationToken);
+                return;
+            }
+        }
+        // 設定まで移動
+        await _serialPort.RunAsync
+        (
+            _config.Sequences[Sequences.DiscardParties]
+                .Concat(_config.Sequences[Sequences.MoveMenu])
+                .Concat(_config.Sequences[Sequences.MoveOptions]).ToArray(),
+            cancellationToken
+        );
+        // 設定変更
+        // 最初に振動をonにしているので、奇数回(iが偶数)はdisable、偶数回はenableで固定
+        for (var i = 0; i < advances.ChangeSetting; i++)
+        {
+            await _serialPort.RunAsync(_config.Sequences[i % 2 == 0 ? Sequences.DisableVibration : Sequences.EnableVibration], cancellationToken);
+        }
+    }
+
+    #region Config(config.json)
+    /// <summary>
+    /// config.json
+    /// </summary>
+    class Config
+    {
+#pragma warning disable CS8618
+        [JsonPropertyName("portName")]
+        public string PortName { get; set; }
+        [JsonPropertyName("captureIndex")]
+        public int CaptureIndex { get; set; }
+        [JsonPropertyName("token")]
+        public string Token { get; set; }
+        [JsonPropertyName("tsv")]
+        public UInt32 Tsv { get; set; }
+        [JsonPropertyName("targets")]
+        public UInt32[] Targets { get; set; }
+        [JsonPropertyName("waitTime")]
+        public Dictionary<string, TimeSpan> WaitTime { get; set; }
+        [JsonPropertyName("advancesPerSecond")]
+        public double AdvancesPerSecond { get; set; }
+        [JsonPropertyName("sequences")]
+        public Dictionary<string, Operation[]> Sequences { get; set; }
+#pragma warning restore CS8618
+    }
+    /// <summary>
+    /// <see cref="Config.Sequences"/> のKey一覧
+    /// </summary>
+    static class Sequences
+    {
+        public static readonly string Reset = "reset";
+        public static readonly string MoveQuickBattle = "moveQuickBattle";
+        public static readonly string LoadParties = "loadParties";
+        public static readonly string DiscardParties = "discardParties";
+        public static readonly string EntryToBattle = "entryToBattle";
+        public static readonly string ExitBattle = "exitBattle";
+        public static readonly string MoveMenu = "moveMenu";
+        public static readonly string MoveOptions = "moveOptions";
+        public static readonly string EnableVibration = "enableVibration";
+        public static readonly string DisableVibration = "disableVibration";
+        public static readonly string Finalize = "finalize";
+    }
+    /// <summary>
+    /// <see cref="Config.WaitTime"/> のKey一覧
+    /// </summary>
+    static class WaitTime
+    {
+        public static readonly string Maximum = "maximum";
+        public static readonly string Left = "left";
+    }
+    #endregion
+
+    #region IDisposable implementation
+    private bool disposedValue;
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposedValue)
+        {
+            if (disposing)
+            {
+                _cancellationTokenSource.Cancel();
+                _task.Wait();
+                _mat.Dispose();
+
+                _serialPort.Dispose();
+            }
+
+            disposedValue = true;
+        }
+    }
+    void IDisposable.Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+    #endregion
+}
