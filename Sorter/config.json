@@ -1,6 +1,6 @@
 {
     "portName": "COM6",
-    "captureIndex": 1,
+    "captureIndex": 0,
     "token": "",
     "tsv": 65536,
     "targets": [
@@ -12,6 +12,9 @@
         "left": "00:03:00"
     },
     "advancesPerSecond": 3713.6,
+    "allowLoad": true,
+    "advancesByLoading": 14,
+    "advancesByOpeningItems": 14,
     "sequences": {
         "reset": [
             {
@@ -353,7 +356,7 @@
                 "interval": 2000
             }
         ],
-        "finalize": [
+        "moveContinue": [
             {
                 "message": "4",
                 "interval": 100
@@ -362,6 +365,155 @@
                 "message": "3",
                 "interval": 2000
             }
-        ]
+        ],
+        "load": [
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 2000
+            },
+            {
+                "message": "4",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 500
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 6000
+            },
+            {
+                "message": "c",
+                "interval": 100
+            },
+            {
+                "message": "o",
+                "interval": 1000
+            }
+        ],
+        "moveSave": [
+            {
+                "message": "2",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 100
+            },
+            {
+                "message": "2",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 100
+            },
+            {
+                "message": "2",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 1000
+            }
+        ],
+        "save": [
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 1000
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 1000
+            },
+            {
+                "message": "4",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 100
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 10000
+            },
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 1000
+            }
+        ],
+        "moveItems": [
+            {
+                "message": "4",
+                "interval": 100
+            },
+            {
+                "message": "3",
+                "interval": 1000
+            }
+        ],
+        "openCloseItems": [
+            {
+                "message": "a",
+                "interval": 100
+            },
+            {
+                "message": "m",
+                "interval": 2000
+            },
+            {
+                "message": "b",
+                "interval": 100
+            },
+            {
+                "message": "n",
+                "interval": 2500
+            }
+        ],
+        "watchSteps": [
+            {
+                "message": "b",
+                "interval": 100
+            },
+            {
+                "message": "n",
+                "interval": 13000
+            },
+            {
+                "message": "c",
+                "interval": 100
+            },
+            {
+                "message": "o",
+                "interval": 1000
+            }
+        ],
+        "finalize": []
     }
 }

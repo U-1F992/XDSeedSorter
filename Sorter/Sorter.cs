@@ -53,7 +53,7 @@ public class Sorter : IDisposable
         (
             Task.Run(() =>
             {
-                using (var videoCapture = new VideoCapture(_config.CaptureIndex))
+                using (var videoCapture = new VideoCapture(_config.CaptureIndex) { FrameWidth = 1600, FrameHeight = 1200 })
                     while (!_cancellationToken.IsCancellationRequested)
                         lock (_mat)
                             if (videoCapture.Read(_mat) && !ready) ready = true;
@@ -64,7 +64,7 @@ public class Sorter : IDisposable
                 using (var window = new Window())
                     while (!_cancellationToken.IsCancellationRequested)
                     {
-                        window.ShowImage(_mat);
+                        window.ShowImage(_mat.Resize(new Size(), 0.5, 0.5));
                         Cv2.WaitKey(1);
                     }
             }, _cancellationToken)
@@ -347,19 +347,43 @@ public class Sorter : IDisposable
         var mat = new Mat();
 
         // seed微調整のための行動を計算
-        var advances = ConsumptionNavigator.Calculate(currentSeed, targetSeed, _config.Tsv);
-        Console.WriteLine(string.Format
-        (
-            "Generate Quick Battle parties : {0}\nChange vibration option : {1}", 
-            advances.GenerateParties, 
-            advances.ChangeSetting
-        ));
-        await Notifier.SendAsync(_config.Token, string.Format
-        (
-            "目標seedまでの端数を消費します。いますぐバトル生成 : {0}回\n振動設定変更 : {1}回", 
-            advances.GenerateParties, 
-            advances.ChangeSetting
-        ), cancellationToken);
+        var advances = ConsumptionNavigator.Calculate(currentSeed, targetSeed, _config.AllowLoad, _config.AdvancesByLoading, _config.AdvancesByOpeningItems, _config.Tsv);
+        if (!_config.AllowLoad)
+        {
+            Console.WriteLine(string.Format
+            (
+                "Generate Quick Battle parties : {0}\nChange vibration option : {1}", 
+                advances.GenerateParties, 
+                advances.ChangeSetting
+            ));
+            await Notifier.SendAsync(_config.Token, string.Format
+            (
+                "目標seedまでの端数を消費します。\nいますぐバトル生成 : {0}回\n振動設定変更 : {1}回", 
+                advances.GenerateParties, 
+                advances.ChangeSetting
+            ), cancellationToken);
+        }
+        else
+        {
+            Console.WriteLine(string.Format
+            (
+                "Generate Quick Battle parties : {0}\nChange vibration option : {1}\nSave : {2}\nOpen items : {3}\nWatch steps : {4}", 
+                advances.GenerateParties, 
+                advances.ChangeSetting,
+                advances.Save,
+                advances.OpenItems,
+                advances.WatchSteps
+            ));
+            await Notifier.SendAsync(_config.Token, string.Format
+            (
+                "目標seedまでの端数を消費します。\nいますぐバトル生成 : {0}回\n振動設定変更 : {1}回\n「レポート」 : {2}回\n「もちもの」 : {3}回\n腰振り観察 : {4}回", 
+                advances.GenerateParties, 
+                advances.ChangeSetting,
+                advances.Save,
+                advances.OpenItems,
+                advances.WatchSteps
+            ), cancellationToken);
+        }
 
         // いますぐバトル生成
         for (var i = 0; i < advances.GenerateParties; i++)
@@ -384,10 +408,11 @@ public class Sorter : IDisposable
                 }
                 // 現在のseedは特定できた場合
                 // -> 求めたseedと目標seedで微調整を仕切り直す
+                currentSeed = (UInt32)tmp;
                 Console.WriteLine(string.Format("Current seed : {0:X}", currentSeed));
                 await Notifier_SendWithMat(string.Format("現在のseedを再特定しました。\n{0:X}", currentSeed), cancellationToken);
 
-                await AdjustSeed((UInt32)tmp, targetSeed, cancellationToken);
+                await AdjustSeed(currentSeed, targetSeed, cancellationToken);
                 return;
             }
         }
@@ -402,9 +427,29 @@ public class Sorter : IDisposable
         // 設定変更
         // 最初に振動をonにしているので、奇数回(iが偶数)はdisable、偶数回はenableで固定
         for (var i = 0; i < advances.ChangeSetting; i++)
-        {
             await _serialPort.RunAsync(_config.Sequences[i % 2 == 0 ? Sequences.DisableVibration : Sequences.EnableVibration], cancellationToken);
-        }
+
+        if (!_config.AllowLoad) return;
+
+        // レポートまで移動
+        await _serialPort.RunAsync
+        (
+            _config.Sequences[Sequences.MoveContinue]
+                .Concat(_config.Sequences[Sequences.Load])
+                .Concat(_config.Sequences[Sequences.MoveSave]).ToArray(),
+            cancellationToken
+        );
+        for (var i = 0; i < advances.Save; i++)
+            await _serialPort.RunAsync(_config.Sequences[Sequences.Save], cancellationToken);
+
+        // もちもの
+        await _serialPort.RunAsync(_config.Sequences[Sequences.MoveItems], cancellationToken);
+        for (var i = 0; i < advances.OpenItems; i++)
+            await _serialPort.RunAsync(_config.Sequences[Sequences.OpenCloseItems], cancellationToken);
+
+        // 腰振り観察
+        for (var i = 0; i < advances.WatchSteps; i++)
+            await _serialPort.RunAsync(_config.Sequences[Sequences.WatchSteps], cancellationToken);
     }
 
     #region Config(config.json)
@@ -428,6 +473,12 @@ public class Sorter : IDisposable
         public Dictionary<string, TimeSpan> WaitTime { get; set; }
         [JsonPropertyName("advancesPerSecond")]
         public double AdvancesPerSecond { get; set; }
+        [JsonPropertyName("allowLoad")]
+        public bool AllowLoad { get; set; }
+        [JsonPropertyName("advancesByLoading")]
+        public int AdvancesByLoading { get; set; }
+        [JsonPropertyName("advancesByOpeningItems")]
+        public int AdvancesByOpeningItems { get; set; }
         [JsonPropertyName("sequences")]
         public Dictionary<string, Operation[]> Sequences { get; set; }
 #pragma warning restore CS8618
@@ -447,6 +498,13 @@ public class Sorter : IDisposable
         public static readonly string MoveOptions = "moveOptions";
         public static readonly string EnableVibration = "enableVibration";
         public static readonly string DisableVibration = "disableVibration";
+        public static readonly string MoveContinue = "moveContinue";
+        public static readonly string Load = "load";
+        public static readonly string MoveSave = "moveSave";
+        public static readonly string Save = "save";
+        public static readonly string MoveItems = "moveItems";
+        public static readonly string OpenCloseItems = "openCloseItems";
+        public static readonly string WatchSteps = "watchSteps";
         public static readonly string Finalize = "finalize";
     }
     /// <summary>
