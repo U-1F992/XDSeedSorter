@@ -116,6 +116,8 @@ public class Sorter : IDisposable
             cancellationToken
         );
 
+        var previousWaitTime = new TimeSpan();
+        var currentWaitTime = new TimeSpan();
         do
         {
             do
@@ -127,6 +129,7 @@ public class Sorter : IDisposable
             } while (target.WaitTime > _config.WaitTime[WaitTime.Maximum]);
             Console.WriteLine("");
             Console.WriteLine(string.Format("Suitable for wait : {0:X} -> {1:X}", currentSeed, target.Seed));
+            previousWaitTime = target.WaitTime;
 
             // 算出された待機時間が、いますぐバトル生成で微調整するために残す消費時間より長い場合
             // 高速消費
@@ -151,12 +154,19 @@ public class Sorter : IDisposable
                 currentSeed = (uint)tmp;
                 Console.WriteLine(string.Format("Current seed : {0:X}", currentSeed));
                 await Notifier_SendWithMat(string.Format("高速消費が完了しました。\n{0:X}", currentSeed), cancellationToken);
-
-                target = SetTarget(currentSeed);
             }
 
-            // 仮にファイヤー出し過ぎてseed超えてしまった場合は、待機時間は先ほどwhileを抜けた条件を満たせなくなるので、リセットに戻れる
-        } while (target.WaitTime > _config.WaitTime[WaitTime.Maximum]);
+            // 高速消費を必要としなかった場合は currentWaitTime と previousWaitTime は同じ値なのでwhileを抜ける
+            // 高速消費を使った場合は、currentWaitTime は previousWaitTime より短くなっていないと失敗している(seedを通り越している)
+            currentWaitTime = TimeSpan.FromSeconds(target.Seed.GetIndex(currentSeed) / _config.AdvancesPerSecond);
+            if (currentWaitTime > previousWaitTime)
+            {
+                Console.WriteLine("Passed target seed. Reset...");
+                Console.WriteLine("");
+                await Notifier.SendAsync(_config.Token, "高速消費後の待機時間が、消費前の待機時間を上回りました。待機時間が長過ぎて目標のseedを通り越したと考えられます。リセットします...", cancellationToken);
+            }
+            else break;
+        } while (true);
 
         try
         {
@@ -352,14 +362,14 @@ public class Sorter : IDisposable
         {
             Console.WriteLine(string.Format
             (
-                "Generate Quick Battle parties : {0}\nChange vibration option : {1}", 
-                advances.GenerateParties, 
+                "Generate Quick Battle parties : {0}\nChange vibration option : {1}",
+                advances.GenerateParties,
                 advances.ChangeSetting
             ));
             await Notifier.SendAsync(_config.Token, string.Format
             (
-                "目標seedまでの端数を消費します。\nいますぐバトル生成 : {0}回\n振動設定変更 : {1}回", 
-                advances.GenerateParties, 
+                "目標seedまでの端数を消費します。\nいますぐバトル生成 : {0}回\n振動設定変更 : {1}回",
+                advances.GenerateParties,
                 advances.ChangeSetting
             ), cancellationToken);
         }
@@ -367,8 +377,8 @@ public class Sorter : IDisposable
         {
             Console.WriteLine(string.Format
             (
-                "Generate Quick Battle parties : {0}\nChange vibration option : {1}\nSave : {2}\nOpen items : {3}\nWatch steps : {4}", 
-                advances.GenerateParties, 
+                "Generate Quick Battle parties : {0}\nChange vibration option : {1}\nSave : {2}\nOpen items : {3}\nWatch steps : {4}",
+                advances.GenerateParties,
                 advances.ChangeSetting,
                 advances.Save,
                 advances.OpenItems,
@@ -376,8 +386,8 @@ public class Sorter : IDisposable
             ));
             await Notifier.SendAsync(_config.Token, string.Format
             (
-                "目標seedまでの端数を消費します。\nいますぐバトル生成 : {0}回\n振動設定変更 : {1}回\n「レポート」 : {2}回\n「もちもの」 : {3}回\n腰振り観察 : {4}回", 
-                advances.GenerateParties, 
+                "目標seedまでの端数を消費します。\nいますぐバトル生成 : {0}回\n振動設定変更 : {1}回\n「レポート」 : {2}回\n「もちもの」 : {3}回\n腰振り観察 : {4}回",
+                advances.GenerateParties,
                 advances.ChangeSetting,
                 advances.Save,
                 advances.OpenItems,
