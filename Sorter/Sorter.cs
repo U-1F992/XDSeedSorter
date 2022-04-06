@@ -64,7 +64,7 @@ public class Sorter : IDisposable
                 using (var window = new Window())
                     while (!_cancellationToken.IsCancellationRequested)
                     {
-                        window.ShowImage(_mat.Resize(new Size(), 0.5, 0.5));
+                        window.ShowImage(_mat.Resize(new Size(), 0.3, 0.3));
                         Cv2.WaitKey(1);
                     }
             }, _cancellationToken)
