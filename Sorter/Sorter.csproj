@@ -12,8 +12,8 @@
     <PackageReference Include="OpenCvSharp4" Version="4.5.5.20211231" />
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.5.5.20211231" />
     <PackageReference Include="PokemonPRNG" Version="3.2.0" />
-    <PackageReference Include="PokemonXDImageLibrary" Version="0.2.0" />
-    <PackageReference Include="Sunameri" Version="3.1.0" />
+    <PackageReference Include="PokemonXDImageLibrary" Version="0.2.1" />
+    <PackageReference Include="Sunameri" Version="3.2.0" />
 
     <None Update="config.json" CopyToOutputDirectory="Always" />
   </ItemGroup>
