@@ -1,6 +1,6 @@
 {
     "portName": "COM6",
-    "captureIndex": 0,
+    "captureIndex": 1,
     "token": "",
     "tsv": 65536,
     "targets": [
@@ -19,15 +19,15 @@
         "reset": [
             {
                 "message": "b",
-                "interval": 0
+                "interval": 50
             },
             {
                 "message": "c",
-                "interval": 0
+                "interval": 50
             },
             {
                 "message": "h",
-                "interval": 5000
+                "interval": 1000
             },
             {
                 "message": "t",
@@ -97,7 +97,7 @@
             },
             {
                 "message": "m",
-                "interval": 1000
+                "interval": 3000
             }
         ],
         "loadParties": [
@@ -107,17 +107,17 @@
             },
             {
                 "message": "m",
-                "interval": 1000
+                "interval": 3000
             }
         ],
         "discardParties": [
             {
                 "message": "b",
-                "interval": 100
+                "interval": 300
             },
             {
                 "message": "n",
-                "interval": 1000
+                "interval": 3000
             }
         ],
         "entryToBattle": [
