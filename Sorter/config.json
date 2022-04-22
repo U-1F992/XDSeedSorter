@@ -97,7 +97,7 @@
             },
             {
                 "message": "m",
-                "interval": 3000
+                "interval": 1500
             }
         ],
         "loadParties": [
@@ -107,7 +107,7 @@
             },
             {
                 "message": "m",
-                "interval": 3000
+                "interval": 1500
             }
         ],
         "discardParties": [
@@ -117,7 +117,7 @@
             },
             {
                 "message": "n",
-                "interval": 3000
+                "interval": 1500
             }
         ],
         "entryToBattle": [

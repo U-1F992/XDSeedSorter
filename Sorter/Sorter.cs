@@ -32,18 +32,8 @@ public class Sorter : IDisposable
         // デバイス割り当て
         _serialPort = new SerialPort(_config.PortName, 4800);
         // WHALEからのメッセージをConsoleに書いていく
-        _serialPort.DtrEnable = true;
-        _serialPort.Encoding = Encoding.UTF8;
-        _serialPort.DataReceived += (object sender, SerialDataReceivedEventArgs e) =>
-        {
-            var serialPort = (SerialPort)sender;
-            if (!serialPort.IsOpen) return;
-            var data = serialPort.ReadExisting();
-            if (string.IsNullOrEmpty(data) || string.IsNullOrWhiteSpace(data)) return;
-            // Console.Error.WriteLine(string.Format("[WHALE] [TRACE] {0} -> {1}", DateTime.Now.ToString("HH:mm:ss.fff"), data.Replace("\n", "")));
-        };
         _serialPort.Open();
-        _serialPort.Initialize();
+        Thread.Sleep(500);
 
         // _videoCaptureから_matを取得して表示を更新する
         _cancellationTokenSource = new CancellationTokenSource();
@@ -396,34 +386,44 @@ public class Sorter : IDisposable
         }
 
         // いますぐバトル生成
+        var count = 0;
         for (var i = 0; i < advances.GenerateParties; i++)
         {
             await _serialPort.RunAsync(_config.Sequences[Sequences.DiscardParties].Concat(_config.Sequences[Sequences.LoadParties]).ToArray(), cancellationToken);
 
             lock (_mat) mat = _mat.Clone();
             var parties = advances.Parties[i];
-            if (new QuickBattleParties((int)parties.pIndex, (int)parties.eIndex, parties.HP) != mat.GetQuickBattleParties())
+            try
             {
-                Console.WriteLine("Found a discrepancy between the prediction and actually generated. Attempt to re-find current seed.");
-                Console.WriteLine("");
-                await Notifier_SendWithMat("生成予測と実際に生成された手持ちに齟齬が見られます。現在seedの再特定を試みます。", cancellationToken);
-
-                // 予測と実際に生成された手持ちに齟齬があった場合
-                UInt32? tmp;
-                if ((tmp = await GetCurrentSeed(cancellationToken)) == null)
+                if (new QuickBattleParties((int)parties.pIndex, (int)parties.eIndex, parties.HP) != mat.GetQuickBattleParties())
                 {
-                    // そもそも違う画面になってしまっている場合
-                    // -> StartAsyncのtry-catchに拾ってもらってリセット
-                    throw new Exception();
-                }
-                // 現在のseedは特定できた場合
-                // -> 求めたseedと目標seedで微調整を仕切り直す
-                currentSeed = (UInt32)tmp;
-                Console.WriteLine(string.Format("Current seed : {0:X}", currentSeed));
-                await Notifier_SendWithMat(string.Format("現在のseedを再特定しました。\n{0:X}", currentSeed), cancellationToken);
+                    Console.WriteLine("Found a discrepancy between the prediction and actually generated. Attempt to re-find current seed.");
+                    Console.WriteLine("");
+                    await Notifier_SendWithMat("生成予測と実際に生成された手持ちに齟齬が見られます。現在seedの再特定を試みます。", cancellationToken);
 
-                await AdjustSeed(currentSeed, targetSeed, cancellationToken);
-                return;
+                    // 予測と実際に生成された手持ちに齟齬があった場合
+                    UInt32? tmp;
+                    if ((tmp = await GetCurrentSeed(cancellationToken)) == null)
+                    {
+                        // そもそも違う画面になってしまっている場合
+                        // -> StartAsyncのtry-catchに拾ってもらってリセット
+                        throw new Exception();
+                    }
+                    // 現在のseedは特定できた場合
+                    // -> 求めたseedと目標seedで微調整を仕切り直す
+                    currentSeed = (UInt32)tmp;
+                    Console.WriteLine(string.Format("Current seed : {0:X}", currentSeed));
+                    await Notifier_SendWithMat(string.Format("現在のseedを再特定しました。\n{0:X}", currentSeed), cancellationToken);
+
+                    await AdjustSeed(currentSeed, targetSeed, cancellationToken);
+                    return;
+                }
+                count = 0;
+            }
+            catch
+            {
+                Console.Error.WriteLine("[Sorter] [Warning] Mat.GetQuickBattleParties() failed.");
+                if (++count == 10) throw; // 10回連続で失敗すると大域脱出
             }
         }
         // 設定まで移動
