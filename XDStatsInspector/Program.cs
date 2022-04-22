@@ -4,7 +4,7 @@ using LINENotify;
 using OpenCvSharp;
 using PokemonXDImageLibrary;
 
-ConsoleApp.Run(args, ([Option(0, "JSON-style Pokemon's stats. HP, Attack, Defense, Speed, SpAtk, SpDef")] Stats stats) =>
+ConsoleApp.Run(args, ([Option(0, "JSON-style array of Pokemon's stats. HP, Attack, Defense, Speed, SpAtk, SpDef")] int[] stats) =>
 {
     // config.jsonを読み込む
     Config? json = JsonSerializer.Deserialize<Config>(File.ReadAllText(Path.Join(AppContext.BaseDirectory, "config.json")));
@@ -49,12 +49,12 @@ ConsoleApp.Run(args, ([Option(0, "JSON-style Pokemon's stats. HP, Attack, Defens
             var result = new Mat(path).GetStats();
             if
             (!(
-                result.HP == stats.HP &&
-                result.Attack == stats.Attack &&
-                result.Defense == stats.Defense &&
-                result.Speed == stats.Speed &&
-                result.SpAtk == stats.SpAtk &&
-                result.SpDef == stats.SpDef
+                result.HP == stats[0] &&
+                result.Attack == stats[1] &&
+                result.Defense == stats[2] &&
+                result.Speed == stats[3] &&
+                result.SpAtk == stats[4] &&
+                result.SpDef == stats[5]
             ))
             {
                 Console.Error.WriteLine("[Failed] Result does not match.");
@@ -76,13 +76,3 @@ ConsoleApp.Run(args, ([Option(0, "JSON-style Pokemon's stats. HP, Attack, Defens
         Environment.ExitCode = 0;
     }
 });
-
-public class Stats
-{
-    public int HP { get; set; }
-    public int Attack { get; set; }
-    public int Defense { get; set; }
-    public int Speed { get; set; }
-    public int SpAtk { get; set; }
-    public int SpDef { get; set; }
-}
