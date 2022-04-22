@@ -14,13 +14,12 @@
     <PackageReference Include="PokemonPRNG" Version="3.2.0" />
     <PackageReference Include="PokemonXDImageLibrary" Version="0.2.1" />
     <PackageReference Include="Sunameri" Version="3.2.0" />
-
-    <None Update="config.json" CopyToOutputDirectory="Always" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\PokemonXDRNGLibrary\PokemonXDRNGLibrary.csproj" />
     <ProjectReference Include="..\ConsumptionNavigator\ConsumptionNavigator.csproj" />
+    <ProjectReference Include="..\Config\Config.csproj" />
   </ItemGroup>
 
 </Project>
