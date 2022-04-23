@@ -5,7 +5,7 @@ using OpenCvSharp;
 using PokemonXDImageLibrary;
 
 Config config;
-Stats stats;
+Stats[] stats;
 
 try
 {
@@ -14,7 +14,7 @@ try
     config = jsonConfig != null ? jsonConfig : throw new FileNotFoundException();
 
     // stats.json
-    var jsonStats = JsonSerializer.Deserialize<Stats>(File.ReadAllText(Path.Join(AppContext.BaseDirectory, "stats.json")));
+    var jsonStats = JsonSerializer.Deserialize<Stats[]>(File.ReadAllText(Path.Join(AppContext.BaseDirectory, "stats.json")));
     stats = jsonStats != null ? jsonStats : throw new FileNotFoundException();
 }
 catch
@@ -27,11 +27,6 @@ catch
 var mat = new Mat();
 var cancellationTokenSource = new CancellationTokenSource();
 var cancellationToken = cancellationTokenSource.Token;
-Console.CancelKeyPress += (object? sender, ConsoleCancelEventArgs e) =>
-{
-    cancellationTokenSource.Cancel();
-    e.Cancel = true;
-};
 var ready = false;
 var task = Task.Run(() =>
 {
@@ -40,7 +35,7 @@ var task = Task.Run(() =>
             lock (mat)
                 if (videoCapture.Read(mat) && !ready) ready = true;
 }, cancellationToken);
-while (!ready) ;
+while (!ready) Thread.Sleep(1);
 
 // matから画像を取得してVideoCaptureを破棄する
 var path = Path.GetTempFileName() + ".png";
@@ -59,15 +54,24 @@ using (var stream = File.OpenRead(path))
     try
     {
         var result = new Mat(path).GetStats();
-        if
-        (!(
-            result.HP == stats.HP &&
-            result.Attack == stats.Attack &&
-            result.Defense == stats.Defense &&
-            result.Speed == stats.Speed &&
-            result.SpAtk == stats.SpAtk &&
-            result.SpDef == stats.SpDef
-        ))
+        var match = false;
+        foreach (var stat in stats)
+        {
+            if
+            (
+                result.HP == stat.HP &&
+                result.Attack == stat.Attack &&
+                result.Defense == stat.Defense &&
+                result.Speed == stat.Speed &&
+                result.SpAtk == stat.SpAtk &&
+                result.SpDef == stat.SpDef
+            )
+            {
+                match = true;
+                break;
+            }
+        }
+        if (!match)
         {
             Console.WriteLine("false");
             Notifier.Send(config.Token, "[失敗] 引数と一致しませんでした。", stream);
