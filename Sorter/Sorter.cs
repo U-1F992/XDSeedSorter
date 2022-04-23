@@ -1,6 +1,4 @@
-﻿using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json;
 using System.IO.Ports;
 
 using LINENotify;
@@ -14,6 +12,7 @@ namespace XDSeedSorter;
 public class Sorter : IDisposable
 {
     private Config _config;
+    private Dictionary<string, Operation[]> _sequences;
     private List<(uint hp, uint seed)> _xddb;
     private SerialPort _serialPort;
     private CancellationTokenSource _cancellationTokenSource;
@@ -23,8 +22,10 @@ public class Sorter : IDisposable
 
     public Sorter()
     {
-        Config? json = JsonSerializer.Deserialize<Config>(File.ReadAllText(Path.Join(AppContext.BaseDirectory, "config.json")));
-        _config = json != null ? json : throw new FileNotFoundException();
+        var jsonConfig = JsonSerializer.Deserialize<Config>(File.ReadAllText(Path.Join(AppContext.BaseDirectory, "config.json")));
+        _config = jsonConfig != null ? jsonConfig : throw new FileNotFoundException();
+        var jsonSequences = JsonSerializer.Deserialize<Dictionary<string, Operation[]>>(File.ReadAllText(Path.Join(AppContext.BaseDirectory, "sequences.json")));
+        _sequences = jsonSequences != null ? jsonSequences : throw new FileNotFoundException();
 
         // XDDB読み込み
         _xddb = XDDatabase.LoadDB();
@@ -100,9 +101,9 @@ public class Sorter : IDisposable
         // 初回に振動設定を「あり」に変更しておく
         await _serialPort.RunAsync
         (
-            _config.Sequences[Sequences.Reset]
-                .Concat(_config.Sequences[Sequences.MoveOptions])
-                .Concat(_config.Sequences[Sequences.EnableVibration]).ToArray(),
+            _sequences[Sequences.Reset]
+                .Concat(_sequences[Sequences.MoveOptions])
+                .Concat(_sequences[Sequences.EnableVibration]).ToArray(),
             cancellationToken
         );
 
@@ -175,7 +176,7 @@ public class Sorter : IDisposable
             return;
         }
 
-        await _serialPort.RunAsync(_config.Sequences[Sequences.Finalize], cancellationToken);
+        await _serialPort.RunAsync(_sequences[Sequences.Finalize], cancellationToken);
         Console.WriteLine(string.Format("Successfully reached to target seed : {0:X}", target.Seed));
         await Notifier_SendWithMat(string.Format("seed厳選が完了しました。\n{0:X}", target.Seed), cancellationToken);
     }
@@ -215,9 +216,9 @@ public class Sorter : IDisposable
             // リセット -> いますぐバトル1回目読み込み
             await _serialPort.RunAsync
             (
-                _config.Sequences[Sequences.Reset]
-                    .Concat(_config.Sequences[Sequences.MoveQuickBattle])
-                    .Concat(_config.Sequences[Sequences.LoadParties]).ToArray(),
+                _sequences[Sequences.Reset]
+                    .Concat(_sequences[Sequences.MoveQuickBattle])
+                    .Concat(_sequences[Sequences.LoadParties]).ToArray(),
                 cancellationToken
             );
 
@@ -244,7 +245,7 @@ public class Sorter : IDisposable
         var quickbattles = new QuickBattleParties?[2];
 
         // いますぐバトル1回目
-        await _serialPort.RunAsync(_config.Sequences[Sequences.DiscardParties].Concat(_config.Sequences[Sequences.LoadParties]).ToArray(), cancellationToken);
+        await _serialPort.RunAsync(_sequences[Sequences.DiscardParties].Concat(_sequences[Sequences.LoadParties]).ToArray(), cancellationToken);
         try
         {
             lock (_mat) mat = _mat.Clone();
@@ -257,7 +258,7 @@ public class Sorter : IDisposable
         do
         {
             // いますぐバトル2回目以降
-            await _serialPort.RunAsync(_config.Sequences[Sequences.DiscardParties].Concat(_config.Sequences[Sequences.LoadParties]).ToArray(), cancellationToken);
+            await _serialPort.RunAsync(_sequences[Sequences.DiscardParties].Concat(_sequences[Sequences.LoadParties]).ToArray(), cancellationToken);
             try
             {
                 lock (_mat) mat = _mat.Clone();
@@ -305,7 +306,7 @@ public class Sorter : IDisposable
             {
                 while (mat.GetQuickBattleParties().COM.Index != 2)
                 {
-                    await _serialPort.RunAsync(_config.Sequences[Sequences.DiscardParties].Concat(_config.Sequences[Sequences.LoadParties]).ToArray(), cancellationToken);
+                    await _serialPort.RunAsync(_sequences[Sequences.DiscardParties].Concat(_sequences[Sequences.LoadParties]).ToArray(), cancellationToken);
                     lock (_mat) mat = _mat.Clone();
                 }
                 break;
@@ -320,12 +321,12 @@ public class Sorter : IDisposable
         mat.Dispose();
 
         // 戦闘入って待機して出る
-        await _serialPort.RunAsync(_config.Sequences[Sequences.EntryToBattle], cancellationToken);
+        await _serialPort.RunAsync(_sequences[Sequences.EntryToBattle], cancellationToken);
         await Task.Delay(waitTime, cancellationToken);
         await _serialPort.RunAsync
         (
-            _config.Sequences[Sequences.ExitBattle]
-                .Concat(_config.Sequences[Sequences.LoadParties]).ToArray(),
+            _sequences[Sequences.ExitBattle]
+                .Concat(_sequences[Sequences.LoadParties]).ToArray(),
             cancellationToken
         );
     }
@@ -389,7 +390,7 @@ public class Sorter : IDisposable
         var count = 0;
         for (var i = 0; i < advances.GenerateParties; i++)
         {
-            await _serialPort.RunAsync(_config.Sequences[Sequences.DiscardParties].Concat(_config.Sequences[Sequences.LoadParties]).ToArray(), cancellationToken);
+            await _serialPort.RunAsync(_sequences[Sequences.DiscardParties].Concat(_sequences[Sequences.LoadParties]).ToArray(), cancellationToken);
 
             lock (_mat) mat = _mat.Clone();
             var parties = advances.Parties[i];
@@ -429,103 +430,38 @@ public class Sorter : IDisposable
         // 設定まで移動
         await _serialPort.RunAsync
         (
-            _config.Sequences[Sequences.DiscardParties]
-                .Concat(_config.Sequences[Sequences.MoveMenu])
-                .Concat(_config.Sequences[Sequences.MoveOptions]).ToArray(),
+            _sequences[Sequences.DiscardParties]
+                .Concat(_sequences[Sequences.MoveMenu])
+                .Concat(_sequences[Sequences.MoveOptions]).ToArray(),
             cancellationToken
         );
         // 設定変更
         // 最初に振動をonにしているので、奇数回(iが偶数)はdisable、偶数回はenableで固定
         for (var i = 0; i < advances.ChangeSetting; i++)
-            await _serialPort.RunAsync(_config.Sequences[i % 2 == 0 ? Sequences.DisableVibration : Sequences.EnableVibration], cancellationToken);
+            await _serialPort.RunAsync(_sequences[i % 2 == 0 ? Sequences.DisableVibration : Sequences.EnableVibration], cancellationToken);
 
         if (!_config.AllowLoad) return;
 
         // レポートまで移動
         await _serialPort.RunAsync
         (
-            _config.Sequences[Sequences.MoveContinue]
-                .Concat(_config.Sequences[Sequences.Load])
-                .Concat(_config.Sequences[Sequences.MoveSave]).ToArray(),
+            _sequences[Sequences.MoveContinue]
+                .Concat(_sequences[Sequences.Load])
+                .Concat(_sequences[Sequences.MoveSave]).ToArray(),
             cancellationToken
         );
         for (var i = 0; i < advances.Save; i++)
-            await _serialPort.RunAsync(_config.Sequences[Sequences.Save], cancellationToken);
+            await _serialPort.RunAsync(_sequences[Sequences.Save], cancellationToken);
 
         // もちもの
-        await _serialPort.RunAsync(_config.Sequences[Sequences.MoveItems], cancellationToken);
+        await _serialPort.RunAsync(_sequences[Sequences.MoveItems], cancellationToken);
         for (var i = 0; i < advances.OpenItems; i++)
-            await _serialPort.RunAsync(_config.Sequences[Sequences.OpenCloseItems], cancellationToken);
+            await _serialPort.RunAsync(_sequences[Sequences.OpenCloseItems], cancellationToken);
 
         // 腰振り観察
         for (var i = 0; i < advances.WatchSteps; i++)
-            await _serialPort.RunAsync(_config.Sequences[Sequences.WatchSteps], cancellationToken);
+            await _serialPort.RunAsync(_sequences[Sequences.WatchSteps], cancellationToken);
     }
-
-    #region Config(config.json)
-    /// <summary>
-    /// config.json
-    /// </summary>
-    class Config
-    {
-#pragma warning disable CS8618
-        [JsonPropertyName("portName")]
-        public string PortName { get; set; }
-        [JsonPropertyName("captureIndex")]
-        public int CaptureIndex { get; set; }
-        [JsonPropertyName("token")]
-        public string Token { get; set; }
-        [JsonPropertyName("tsv")]
-        public UInt32 Tsv { get; set; }
-        [JsonPropertyName("targets")]
-        public UInt32[] Targets { get; set; }
-        [JsonPropertyName("waitTime")]
-        public Dictionary<string, TimeSpan> WaitTime { get; set; }
-        [JsonPropertyName("advancesPerSecond")]
-        public double AdvancesPerSecond { get; set; }
-        [JsonPropertyName("allowLoad")]
-        public bool AllowLoad { get; set; }
-        [JsonPropertyName("advancesByLoading")]
-        public int AdvancesByLoading { get; set; }
-        [JsonPropertyName("advancesByOpeningItems")]
-        public int AdvancesByOpeningItems { get; set; }
-        [JsonPropertyName("sequences")]
-        public Dictionary<string, Operation[]> Sequences { get; set; }
-#pragma warning restore CS8618
-    }
-    /// <summary>
-    /// <see cref="Config.Sequences"/> のKey一覧
-    /// </summary>
-    static class Sequences
-    {
-        public static readonly string Reset = "reset";
-        public static readonly string MoveQuickBattle = "moveQuickBattle";
-        public static readonly string LoadParties = "loadParties";
-        public static readonly string DiscardParties = "discardParties";
-        public static readonly string EntryToBattle = "entryToBattle";
-        public static readonly string ExitBattle = "exitBattle";
-        public static readonly string MoveMenu = "moveMenu";
-        public static readonly string MoveOptions = "moveOptions";
-        public static readonly string EnableVibration = "enableVibration";
-        public static readonly string DisableVibration = "disableVibration";
-        public static readonly string MoveContinue = "moveContinue";
-        public static readonly string Load = "load";
-        public static readonly string MoveSave = "moveSave";
-        public static readonly string Save = "save";
-        public static readonly string MoveItems = "moveItems";
-        public static readonly string OpenCloseItems = "openCloseItems";
-        public static readonly string WatchSteps = "watchSteps";
-        public static readonly string Finalize = "finalize";
-    }
-    /// <summary>
-    /// <see cref="Config.WaitTime"/> のKey一覧
-    /// </summary>
-    static class WaitTime
-    {
-        public static readonly string Maximum = "maximum";
-        public static readonly string Left = "left";
-    }
-    #endregion
 
     #region IDisposable implementation
     private bool disposedValue;

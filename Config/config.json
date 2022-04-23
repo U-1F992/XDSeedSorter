@@ -1,0 +1,18 @@
+{
+    "portName": "COM6",
+    "captureIndex": 1,
+    "token": "",
+    "tsv": 65536,
+    "targets": [
+        195951310,
+        3735943886
+    ],
+    "waitTime": {
+        "maximum": "03:00:00",
+        "left": "00:03:00"
+    },
+    "advancesPerSecond": 3713.6,
+    "allowLoad": true,
+    "advancesByLoading": 14,
+    "advancesByOpeningItems": 14
+}
