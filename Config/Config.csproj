@@ -11,8 +11,4 @@
     <None Update="config.json" CopyToOutputDirectory="Always" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Sunameri" Version="3.2.1" />
-  </ItemGroup>
-
 </Project>

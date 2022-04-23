@@ -14,6 +14,8 @@
     <PackageReference Include="PokemonPRNG" Version="3.2.0" />
     <PackageReference Include="PokemonXDImageLibrary" Version="0.2.1" />
     <PackageReference Include="Sunameri" Version="3.2.1" />
+
+    <None Update="sequences.json" CopyToOutputDirectory="Always" />
   </ItemGroup>
 
   <ItemGroup>

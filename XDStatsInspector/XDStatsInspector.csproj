@@ -5,11 +5,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="ConsoleAppFramework" Version="4.0.6" />
     <PackageReference Include="LINENotify" Version="1.0.0" />
     <PackageReference Include="OpenCvSharp4" Version="4.5.5.20211231" />
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.5.5.20211231" />
     <PackageReference Include="PokemonXDImageLibrary" Version="0.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="stats.json" CopyToOutputDirectory="Always" />
   </ItemGroup>
 
   <PropertyGroup>
