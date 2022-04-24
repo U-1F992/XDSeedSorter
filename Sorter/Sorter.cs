@@ -143,6 +143,7 @@ public class Sorter : IDisposable
                 {
                     await AdvanceByMoltres(waitTime, cancellationToken);
                 }
+                catch (OperationCanceledException) { throw; }
                 catch
                 {
                     Console.WriteLine("Could not find Moltres. Reset...");
@@ -182,7 +183,7 @@ public class Sorter : IDisposable
         {
             await AdjustSeed(currentSeed, target.Seed, cancellationToken);
         }
-        catch (OperationCanceledException) { cancellationToken.ThrowIfCancellationRequested(); }
+        catch (OperationCanceledException) { throw; }
         catch
         {
             // - 目標のseedまで到達する手段がない場合(近過ぎ 40で割り切れない)
