@@ -17,7 +17,7 @@
     <DebugType>embedded</DebugType>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     
-    <Version>3.0.0</Version>
+    <Version>3.0.2</Version>
   </PropertyGroup>
 
 </Project>

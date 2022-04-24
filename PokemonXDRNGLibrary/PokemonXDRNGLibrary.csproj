@@ -10,7 +10,7 @@
   <ItemGroup>
     <EmbeddedResource Include=".\XDDB.bin" LogicalName="XDDB.bin" />
     <PackageReference Include="PokemonPRNG" Version="3.2.0" />
-    <PackageReference Include="PokemonXDImageLibrary" Version="0.2.1" />
+    <PackageReference Include="PokemonXDImageLibrary" Version="0.2.3" />
   </ItemGroup>
 
 </Project>
