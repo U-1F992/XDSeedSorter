@@ -139,7 +139,18 @@ public class Sorter : IDisposable
                 Console.WriteLine(string.Format("ETA : {0}", DateTime.Now + waitTime));
                 await Notifier_SendWithMat(string.Format("条件を満たすseedです。高速消費に移行します。\n{0:X} -> {1:X}\nETA : {2}", currentSeed, target.Seed, DateTime.Now + waitTime), cancellationToken);
 
-                await AdvanceByMoltres(waitTime, cancellationToken);
+                try
+                {
+                    await AdvanceByMoltres(waitTime, cancellationToken);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch
+                {
+                    Console.WriteLine("Could not find Moltres. Reset...");
+                    Console.WriteLine("");
+                    await Notifier.SendAsync(_config.Token, "いますぐバトル情報を取得できませんでした。リセットします...", cancellationToken);
+                    continue;
+                }
                 Console.WriteLine("Faster advance has been completed.");
                 Console.WriteLine("");
 
@@ -172,7 +183,7 @@ public class Sorter : IDisposable
         {
             await AdjustSeed(currentSeed, target.Seed, cancellationToken);
         }
-        catch (OperationCanceledException) { cancellationToken.ThrowIfCancellationRequested(); }
+        catch (OperationCanceledException) { throw; }
         catch
         {
             // - 目標のseedまで到達する手段がない場合(近過ぎ 40で割り切れない)
@@ -260,6 +271,7 @@ public class Sorter : IDisposable
             lock (_mat) mat = _mat.Clone();
             quickbattles[0] = mat.GetQuickBattleParties();
         }
+        catch (OperationCanceledException) { throw; }
         catch { quickbattles[0] = null; }
 
         List<uint> candidates;
@@ -273,6 +285,7 @@ public class Sorter : IDisposable
                 lock (_mat) mat = _mat.Clone();
                 quickbattles[1] = mat.GetQuickBattleParties();
             }
+            catch (OperationCanceledException) { throw; }
             catch
             {
                 quickbattles[1] = null;
@@ -309,6 +322,7 @@ public class Sorter : IDisposable
         lock (_mat) mat = _mat.Clone();
 
         // ファイヤーが出るまで再生成
+        var count = 0;
         while (true)
         {
             try
@@ -320,11 +334,13 @@ public class Sorter : IDisposable
                 }
                 break;
             }
+            catch (OperationCanceledException) { throw; }
             catch
             {
                 // ここでQuickBattleParties取得できないなら、次段の消費後現在seed特定も失敗するはず
                 // 高速消費を諦めてリセットさせる
-                return;
+                Console.Error.WriteLine("[Sorter] [Warning] Mat.GetQuickBattleParties() failed.");
+                if (++count == 10) throw;
             }
         }
         mat.Dispose();
@@ -430,6 +446,7 @@ public class Sorter : IDisposable
                 }
                 count = 0;
             }
+            catch (OperationCanceledException) { throw; }
             catch
             {
                 Console.Error.WriteLine("[Sorter] [Warning] Mat.GetQuickBattleParties() failed.");

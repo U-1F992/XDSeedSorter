@@ -12,7 +12,7 @@
         "left": "00:03:00"
     },
     "advancesPerSecond": 3713.6,
-    "allowLoad": true,
+    "allowLoad": false,
     "advancesByLoading": 14,
     "advancesByOpeningItems": 14
 }
