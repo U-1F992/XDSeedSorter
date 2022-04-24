@@ -14,11 +14,11 @@
         },
         {
             "message": "t",
-            "interval": 0
+            "interval": 50
         },
         {
             "message": "o",
-            "interval": 0
+            "interval": 50
         },
         {
             "message": "n",

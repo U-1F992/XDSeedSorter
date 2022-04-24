@@ -32,9 +32,17 @@ public class Sorter : IDisposable
 
         // デバイス割り当て
         _serialPort = new SerialPort(_config.PortName, 4800);
-        // WHALEからのメッセージをConsoleに書いていく
         _serialPort.Open();
-        Thread.Sleep(500);
+#if DEBUG
+        _serialPort.DtrEnable = true;
+        _serialPort.Encoding = System.Text.Encoding.UTF8;
+        _serialPort.DataReceived += (object sender, SerialDataReceivedEventArgs e) =>
+        {
+            var msg = ((SerialPort)sender).ReadExisting();
+            if (string.IsNullOrEmpty(msg) || string.IsNullOrWhiteSpace(msg)) return;
+            Console.Error.WriteLine("[Sorter] [Trace] [{0}] {1}", DateTime.Now.ToString("HH:mm:ss.fff"), System.Text.RegularExpressions.Regex.Replace(msg, "\\s", ""));
+        };
+#endif
 
         // _videoCaptureから_matを取得して表示を更新する
         _cancellationTokenSource = new CancellationTokenSource();
@@ -60,6 +68,7 @@ public class Sorter : IDisposable
                     }
             }, _cancellationToken)
         );
+        while (!ready) Thread.Sleep(1);
 
         Notifier.Send(_config.Token, "「ポケモンXD 闇の旋風ダーク・ルギア」初期seed厳選を開始します。");
     }
