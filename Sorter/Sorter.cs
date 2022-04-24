@@ -271,6 +271,7 @@ public class Sorter : IDisposable
             lock (_mat) mat = _mat.Clone();
             quickbattles[0] = mat.GetQuickBattleParties();
         }
+        catch (OperationCanceledException) { throw; }
         catch { quickbattles[0] = null; }
 
         List<uint> candidates;
@@ -284,6 +285,7 @@ public class Sorter : IDisposable
                 lock (_mat) mat = _mat.Clone();
                 quickbattles[1] = mat.GetQuickBattleParties();
             }
+            catch (OperationCanceledException) { throw; }
             catch
             {
                 quickbattles[1] = null;
@@ -332,6 +334,7 @@ public class Sorter : IDisposable
                 }
                 break;
             }
+            catch (OperationCanceledException) { throw; }
             catch
             {
                 // ここでQuickBattleParties取得できないなら、次段の消費後現在seed特定も失敗するはず
@@ -443,6 +446,7 @@ public class Sorter : IDisposable
                 }
                 count = 0;
             }
+            catch (OperationCanceledException) { throw; }
             catch
             {
                 Console.Error.WriteLine("[Sorter] [Warning] Mat.GetQuickBattleParties() failed.");
