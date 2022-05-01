@@ -35,15 +35,15 @@ public class Sorter : IDisposable
         _serialPort = new SerialPort(_config.PortName, 4800);
         _serialPort.Open();
         _serialPort.DtrEnable = true;
-#if DEBUG
         _serialPort.Encoding = System.Text.Encoding.UTF8;
         _serialPort.DataReceived += (object sender, SerialDataReceivedEventArgs e) =>
-        {
+        {   
             var msg = ((SerialPort)sender).ReadExisting();
+#if DEBUG
             if (string.IsNullOrEmpty(msg) || string.IsNullOrWhiteSpace(msg)) return;
             Console.Error.WriteLine("[Sorter] [Trace] [{0}] {1}", DateTime.Now.ToString("HH:mm:ss.fff"), System.Text.RegularExpressions.Regex.Replace(msg, "\\s", ""));
-        };
 #endif
+        };
 
         // _videoCaptureから_matを取得して表示を更新する
         _cancellationTokenSource = new CancellationTokenSource();
