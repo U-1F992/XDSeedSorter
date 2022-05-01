@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Diagnostics;
+using System.Text.Json;
 using System.IO.Ports;
 
 using LINENotify;
@@ -48,27 +49,39 @@ public class Sorter : IDisposable
         _cancellationTokenSource = new CancellationTokenSource();
         _cancellationToken = _cancellationTokenSource.Token;
         var ready = false;
+        var timeout = 500;
+        var stopwatch = new Stopwatch();
+
         _task = Task.WhenAll
         (
             Task.Run(() =>
             {
                 using (var videoCapture = new VideoCapture(_config.CaptureIndex) { FrameWidth = 1600, FrameHeight = 1200 })
+                {
+                    stopwatch.Start();
                     while (!_cancellationToken.IsCancellationRequested)
+                    {
                         lock (_mat)
-                            if (videoCapture.Read(_mat) && !ready) ready = true;
+                            videoCapture.Read(_mat);
+
+                        if (!_mat.Empty() && !ready) ready = true;
+                    }
+                }
             }, _cancellationToken),
             Task.Run(() =>
             {
-                while (!ready) ;
+                while (!ready) Thread.Sleep(1);
                 using (var window = new Window())
                     while (!_cancellationToken.IsCancellationRequested)
                     {
-                        window.ShowImage(_mat.Resize(new Size(), 0.3, 0.3));
+                        using (var toShow = _mat.Resize(new Size(), 0.3, 0.3))
+                            window.ShowImage(toShow);
                         Cv2.WaitKey(1);
                     }
             }, _cancellationToken)
         );
-        while (!ready) Thread.Sleep(1);
+        while (!ready && stopwatch.ElapsedMilliseconds < timeout) Thread.Sleep(1);
+        if (!ready) throw new Exception("VideoCapture seems not to open.");
 
         Notifier.Send(_config.Token, "「ポケモンXD 闇の旋風ダーク・ルギア」初期seed厳選を開始します。");
     }
