@@ -33,8 +33,8 @@ public class Sorter : IDisposable
         // デバイス割り当て
         _serialPort = new SerialPort(_config.PortName, 4800);
         _serialPort.Open();
-#if DEBUG
         _serialPort.DtrEnable = true;
+#if DEBUG
         _serialPort.Encoding = System.Text.Encoding.UTF8;
         _serialPort.DataReceived += (object sender, SerialDataReceivedEventArgs e) =>
         {
